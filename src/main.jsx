@@ -8,43 +8,6 @@ const supabase = createClient(
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 
-// ── SUPABASE CLIENT ──
-// Loaded from CDN so this preview works without npm install.
-// In your Vite deploy this is replaced by the npm import — see deploy guide.
-const getSupabase = (() => {
-  let client = null;
-  let listeners = {};
-  // In-memory mock used for preview (no real DB credentials here)
-  const mock = (() => {
-    let store = {};
-    const notify = (t) => (listeners[t]||[]).forEach(fn=>fn());
-    return {
-      from: (table) => ({
-        select: () => { const d=store[table]||null; return { data:d, error:null, then(r){r({data:d,error:null});return this;} }; },
-        upsert: (row) => {
-          if(!store[table])store[table]=[];
-          (Array.isArray(row)?row:[row]).forEach(r=>{
-            const i=store[table].findIndex(x=>x.id===r.id);
-            if(i>=0)store[table][i]={...store[table][i],...r}; else store[table].push(r);
-          });
-          notify(table);
-          return {then(r){r({error:null});return this;}};
-        },
-        update:(v)=>({eq:(c,val)=>{if(store[table]){const r=store[table].find(x=>x[c]===val);if(r)Object.assign(r,v);notify(table);}return{then(r){r({error:null});return this;}}; }}),
-        delete:()=>({eq:(c,val)=>{if(store[table])store[table]=store[table].filter(x=>x[c]!==val);notify(table);return{then(r){r({error:null});return this;}}; }}),
-      }),
-      channel:(n)=>({on:()=>({on:()=>({subscribe:()=>({})}),subscribe:()=>({})}),subscribe:()=>({})}),
-      _subscribe:(table,fn)=>{
-        if(!listeners[table])listeners[table]=[];
-        listeners[table].push(fn);
-        return ()=>{listeners[table]=listeners[table].filter(f=>f!==fn);};
-      }
-    };
-  })();
-  return () => mock;
-})();
-
-const supabase = getSupabase();
 
 // ── COLORS ──
 const C = {
