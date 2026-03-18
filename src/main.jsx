@@ -1,13 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { createClient } from '@supabase/supabase-js';
+import ReactDOM from 'react-dom/client';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
-)
-
-import { useState, useMemo, useEffect, useCallback } from "react";
-
+);
 
 // ── COLORS ──
 const C = {
@@ -80,6 +78,7 @@ const TASK_TEMPLATES = [
 ];
 
 const DEFAULT_PACKING = ["Matching robes","Photo props","Bride sash & tiara","Party games","Playlist ready","Camera / disposables","Reservation confirmations","Transportation booked"];
+
 const CAT_COLORS = {
   "Venue & Date":{bg:"#FDE8E0",text:C.pinkDeep},
   "Vendors":{bg:C.goldLight,text:"#8A6820"},
@@ -97,35 +96,6 @@ function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
 function fmtDate(d) { if (!d) return ""; return new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric"}); }
 function daysUntil(d) { if (!d) return null; return Math.round((new Date(d).setHours(0,0,0,0) - today().getTime()) / 86400000); }
 
-// ── SYNC HOOK ──
-// In your real deploy this subscribes to Supabase Realtime.
-// The mock just calls the loader when the in-memory store changes.
-function useTable(table, loader) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    const { data: rows, error } = await supabase.from(table).select();
-    if (!error) setData(rows);
-    setLoading(false);
-  }, [table]);
-
-  useEffect(() => {
-    load();
-    // Real Supabase realtime subscription — works as-is in deployed app:
-    const channel = supabase
-      .channel(`realtime:${table}`)
-      .on("postgres_changes", { event: "*", schema: "public", table }, load)
-      .subscribe();
-    // Mock fallback:
-    const unsub = supabase._subscribe ? supabase._subscribe(table, load) : () => {};
-    return () => { unsub(); };
-  }, [table, load]);
-
-  return { data, loading, reload: load };
-}
-
-// ── PALM BACKGROUND ──
 function PalmBg() {
   return (
     <svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none",overflow:"hidden"}} xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
@@ -185,7 +155,6 @@ function MetricCard({ label, value, sub, accent }) {
   );
 }
 
-// ── LOADING SPINNER ──
 function Spinner() {
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:16}}>
@@ -196,7 +165,6 @@ function Spinner() {
   );
 }
 
-// ── SETUP SCREEN ──
 function SetupScreen({ onComplete }) {
   const [bride, setBride] = useState("");
   const [partner, setPartner] = useState("");
@@ -237,7 +205,6 @@ function SetupScreen({ onComplete }) {
   );
 }
 
-// ── DETAIL MODAL ──
 function DetailModal({ task, onSave, onClose }) {
   const [details, setDetails] = useState(task.details || {});
   const upd = (k,v) => setDetails(p=>({...p,[k]:v}));
@@ -247,12 +214,12 @@ function DetailModal({ task, onSave, onClose }) {
   const [newLink, setNewLink] = useState({label:"",url:""});
   const [guests, setGuests] = useState(details.guests||[]);
   const [newGuest, setNewGuest] = useState({name:"",email:"",phone:"",rsvp:"pending",dietary:"",table:""});
-  const dt = task.detailType;
+  const dt = task.detailType || task.detail_type;
   const hasAppts = ["dress","fitting","vendor","venue"].includes(dt);
 
-  const fld = (label,key,type="text",opts=null) => (
+  const fld = (lbl,key,type="text",opts=null) => (
     <div style={{marginBottom:12}}>
-      <label>{label}</label>
+      <label>{lbl}</label>
       {type==="select"?<select value={details[key]||""} onChange={e=>upd(key,e.target.value)}><option value="">Select…</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select>
       :type==="textarea"?<textarea rows={3} value={details[key]||""} onChange={e=>upd(key,e.target.value)} style={{resize:"vertical"}}/>
       :<input type={type} value={details[key]||""} onChange={e=>upd(key,e.target.value)}/>}
@@ -340,7 +307,6 @@ function DetailModal({ task, onSave, onClose }) {
   );
 }
 
-// ── EDIT CONFIG MODAL ──
 function EditModal({ config, onSave, onClose }) {
   const [b,setB]=useState(config.bride_name||"");
   const [p,setP]=useState(config.partner_name||"");
@@ -365,7 +331,6 @@ function EditModal({ config, onSave, onClose }) {
   );
 }
 
-// ── TAB: TIMELINE ──
 function TabTimeline({ tasks, onToggle, onDetails, onAddTask }) {
   const [filter,setFilter]=useState("All");
   const [showAdd,setShowAdd]=useState(false);
@@ -382,7 +347,7 @@ function TabTimeline({ tasks, onToggle, onDetails, onAddTask }) {
 
   const filtered=useMemo(()=>{
     const list=filter==="All"?tasks:tasks.filter(t=>t.category===filter);
-    return [...list].sort((a,b)=>new Date(a.due_date||a.dueDate)-new Date(b.due_date||b.dueDate));
+    return [...list].sort((a,b)=>new Date(a.due_date||a.dueDate||0)-new Date(b.due_date||b.dueDate||0));
   },[tasks,filter]);
 
   return (
@@ -448,7 +413,6 @@ function TabTimeline({ tasks, onToggle, onDetails, onAddTask }) {
   );
 }
 
-// ── TAB: CALENDAR ──
 function TabCalendar({ tasks, weddingDate }) {
   const today_=today();
   const [cur,setCur]=useState(()=>{const d=weddingDate?new Date(weddingDate):new Date();return{year:d.getFullYear(),month:d.getMonth()};});
@@ -486,7 +450,7 @@ function TabCalendar({ tasks, weddingDate }) {
             <div key={i} style={{background:"#fff",minHeight:70,padding:4}}>
               {d&&<div style={{width:22,height:22,borderRadius:"50%",background:isToday?C.orangePale:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:isToday?700:400,color:isToday?C.orange:C.textLight,marginBottom:2}}>{d}</div>}
               {shown.map((t,j)=>{
-                const ov=!t.done&&t.dueDate&&new Date(t.dueDate).setHours(0,0,0,0)<today_.getTime();
+                const ov=!t.done&&(t.due_date||t.dueDate)&&new Date(t.due_date||t.dueDate).setHours(0,0,0,0)<today_.getTime();
                 const bg=t.isWedding?C.pink:t.done?C.tealLight:ov?C.pinkLight:C.goldLight;
                 const tc=t.isWedding?"#fff":t.done?C.teal:ov?C.pinkDeep:"#8A6820";
                 return<div key={j} style={{background:bg,color:tc,fontSize:9,padding:"1px 4px",borderRadius:3,marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",fontWeight:t.isWedding?700:400}}>{t.task}</div>;
@@ -497,7 +461,7 @@ function TabCalendar({ tasks, weddingDate }) {
         })}
       </div>
       <div style={{display:"flex",gap:12,marginTop:12,flexWrap:"wrap"}}>
-        {[["Wedding Day",C.pink,"#fff"],["Done",C.tealLight,C.teal],["Overdue",C.pinkLight,C.pinkDeep],["Upcoming",C.goldLight,"#8A6820"]].map(([l,bg])=>(
+        {[["Wedding Day",C.pink],["Done",C.tealLight],["Overdue",C.pinkLight],["Upcoming",C.goldLight]].map(([l,bg])=>(
           <div key={l} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><div style={{width:12,height:12,borderRadius:2,background:bg}}/><span style={{color:C.textLight}}>{l}</span></div>
         ))}
       </div>
@@ -505,7 +469,6 @@ function TabCalendar({ tasks, weddingDate }) {
   );
 }
 
-// ── TAB: BUDGET ──
 function TabBudget({ budget, budgetItems, onUpdateActual }) {
   const estimated=budgetItems.reduce((s,i)=>s+(i.estimated||0),0);
   const actual=budgetItems.reduce((s,i)=>s+(i.actual||0),0);
@@ -526,23 +489,22 @@ function TabBudget({ budget, budgetItems, onUpdateActual }) {
       <div className="card" style={{padding:0,overflow:"hidden"}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 120px 120px 60px"}}>
           {["Item","Estimated","Actual",""].map((h,i)=><div key={i} style={{padding:"10px 14px",background:C.pinkPale,fontSize:11,fontWeight:700,color:C.textMid,textTransform:"uppercase",letterSpacing:"0.05em",borderBottom:`1px solid ${C.borderLight}`}}>{h}</div>)}
-          {budgetItems.map(item=><>
-            <div key={item.id+"n"} style={{padding:"10px 14px",borderBottom:`1px solid ${C.borderLight}`,fontSize:13}}>{item.name}</div>
-            <div key={item.id+"e"} style={{padding:"10px 14px",borderBottom:`1px solid ${C.borderLight}`,fontSize:13,color:C.textMid}}>${(item.estimated||0).toLocaleString()}</div>
+          {budgetItems.map(item=>[
+            <div key={item.id+"n"} style={{padding:"10px 14px",borderBottom:`1px solid ${C.borderLight}`,fontSize:13}}>{item.name}</div>,
+            <div key={item.id+"e"} style={{padding:"10px 14px",borderBottom:`1px solid ${C.borderLight}`,fontSize:13,color:C.textMid}}>${(item.estimated||0).toLocaleString()}</div>,
             <div key={item.id+"a"} style={{padding:"10px 14px",borderBottom:`1px solid ${C.borderLight}`}}>
               <input type="number" value={item.actual||0} onChange={e=>onUpdateActual(item.id,Number(e.target.value))} style={{width:"100%",border:"none",background:"transparent",fontSize:13,color:(item.actual||0)>(item.estimated||0)?C.orange:(item.actual||0)>0?C.teal:C.textLight,padding:0,outline:"none"}}/>
-            </div>
+            </div>,
             <div key={item.id+"x"} style={{padding:"10px 14px",borderBottom:`1px solid ${C.borderLight}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {(item.actual||0)>0&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:10,background:(item.actual||0)>(item.estimated||0)?"#FFE0D5":"#E0F5F0",color:(item.actual||0)>(item.estimated||0)?C.orange:C.teal,fontWeight:700}}>{(item.actual||0)>(item.estimated||0)?"over":"paid"}</span>}
             </div>
-          </>)}
+          ])}
         </div>
       </div>
     </div>
   );
 }
 
-// ── TAB: VENDORS ──
 function TabVendors({ tasks, onToggle, onDetails }) {
   const vendors=tasks.filter(t=>t.category==="Vendors");
   const t0=today();
@@ -582,7 +544,6 @@ function TabVendors({ tasks, onToggle, onDetails }) {
   );
 }
 
-// ── TAB: VISION ──
 function TabVision({ wishlist, onUpdate }) {
   const [inputs,setInputs]=useState({must:"",nice:"",not:""});
   const cols=[
@@ -619,7 +580,6 @@ function TabVision({ wishlist, onUpdate }) {
   );
 }
 
-// ── TAB: BACHELORETTE ──
 function TabBachelorette({ bach, onUpdate }) {
   const upd=(k,v)=>onUpdate({...bach,[k]:v});
   const [newGuest,setNewGuest]=useState({name:"",email:"",phone:"",rsvp:"pending",paid:false});
@@ -742,7 +702,6 @@ function TabBachelorette({ bach, onUpdate }) {
   );
 }
 
-// ── TAB: QUICK GROUNDING ──
 function TabWhoopee() {
   const [pressed,setPressed]=useState(false);
   const [count,setCount]=useState(0);
@@ -782,7 +741,7 @@ function TabWhoopee() {
       <div className="pf" style={{fontSize:28,fontWeight:900,color:C.pinkDeep}}>Quick Grounding 🌬️</div>
       <div style={{fontSize:13,color:C.textLight,maxWidth:320}}>Wedding planning stressing you out? This is a judgement-free zone. Let it out.</div>
       <div onClick={()=>{setPressed(true);playFart();setTimeout(()=>setPressed(false),200);}}
-        style={{width:200,height:160,borderRadius:"50%",background:pressed?`radial-gradient(ellipse at 45% 40%,#F5C4B8,${C.pink})`:`radial-gradient(ellipse at 38% 35%,#FAE0D5,${C.pinkLight})`,border:`3px solid ${C.pink}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:0,transform:pressed?"scale(0.88) scaleY(0.75)":"scale(1)",transition:"transform 0.08s ease",boxShadow:pressed?`0 2px 8px rgba(232,128,106,0.3)`:`0 10px 32px rgba(232,128,106,0.25)`,userSelect:"none"}}>
+        style={{width:200,height:160,borderRadius:"50%",background:pressed?`radial-gradient(ellipse at 45% 40%,#F5C4B8,${C.pink})`:`radial-gradient(ellipse at 38% 35%,#FAE0D5,${C.pinkLight})`,border:`3px solid ${C.pink}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",transform:pressed?"scale(0.88) scaleY(0.75)":"scale(1)",transition:"transform 0.08s ease",boxShadow:pressed?`0 2px 8px rgba(232,128,106,0.3)`:`0 10px 32px rgba(232,128,106,0.25)`,userSelect:"none"}}>
         <span style={{fontSize:52,lineHeight:1,marginBottom:4}}>💨</span>
         <span style={{fontSize:10,color:C.pinkDeep,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase"}}>squeeze me</span>
       </div>
@@ -793,7 +752,6 @@ function TabWhoopee() {
   );
 }
 
-// ── SYNC STATUS INDICATOR ──
 function SyncDot({ syncing }) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:syncing?C.gold:C.teal}}>
@@ -803,7 +761,6 @@ function SyncDot({ syncing }) {
   );
 }
 
-// ── MAIN APP ──
 function App() {
   const [config, setConfig] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -816,43 +773,42 @@ function App() {
   const [modalTask, setModalTask] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
 
-  // ── LOAD ALL DATA ──
   useEffect(() => {
     async function loadAll() {
-      const [cfgRes, tasksRes, budgetRes, wishRes, bachRes] = await Promise.all([
-        supabase.from("wedding_config").select(),
-        supabase.from("tasks").select(),
-        supabase.from("budget_items").select(),
-        supabase.from("wishlist").select(),
-        supabase.from("bachelorette").select(),
-      ]);
-      if (cfgRes.data?.[0]) setConfig(cfgRes.data[0]);
-      if (tasksRes.data) setTasks(tasksRes.data);
-      if (budgetRes.data) setBudgetItems(budgetRes.data);
-      if (wishRes.data?.[0]) setWishlist(wishRes.data[0]);
-      if (bachRes.data?.[0]) setBach(bachRes.data[0]);
+      try {
+        const [cfgRes, tasksRes, budgetRes, wishRes, bachRes] = await Promise.all([
+          supabase.from("wedding_config").select(),
+          supabase.from("tasks").select(),
+          supabase.from("budget_items").select(),
+          supabase.from("wishlist").select(),
+          supabase.from("bachelorette").select(),
+        ]);
+        if (cfgRes.data?.[0]) setConfig(cfgRes.data[0]);
+        if (tasksRes.data) setTasks(tasksRes.data);
+        if (budgetRes.data) setBudgetItems(budgetRes.data);
+        if (wishRes.data?.[0]) setWishlist(wishRes.data[0]);
+        if (bachRes.data?.[0]) setBach(bachRes.data[0]);
+      } catch(e) { console.error("Load error:", e); }
       setLoading(false);
     }
     loadAll();
 
-    // Realtime subscriptions
-    const unsubs = [
-      supabase._subscribe("wedding_config", async () => { const {data} = await supabase.from("wedding_config").select(); if(data?.[0]) setConfig(data[0]); }),
-      supabase._subscribe("tasks", async () => { const {data} = await supabase.from("tasks").select(); if(data) setTasks(data); }),
-      supabase._subscribe("budget_items", async () => { const {data} = await supabase.from("budget_items").select(); if(data) setBudgetItems(data); }),
-      supabase._subscribe("wishlist", async () => { const {data} = await supabase.from("wishlist").select(); if(data?.[0]) setWishlist(data[0]); }),
-      supabase._subscribe("bachelorette", async () => { const {data} = await supabase.from("bachelorette").select(); if(data?.[0]) setBach(data[0]); }),
+    const channels = [
+      supabase.channel("cfg").on("postgres_changes",{event:"*",schema:"public",table:"wedding_config"},()=>supabase.from("wedding_config").select().then(r=>r.data?.[0]&&setConfig(r.data[0]))).subscribe(),
+      supabase.channel("tsk").on("postgres_changes",{event:"*",schema:"public",table:"tasks"},()=>supabase.from("tasks").select().then(r=>r.data&&setTasks(r.data))).subscribe(),
+      supabase.channel("bgt").on("postgres_changes",{event:"*",schema:"public",table:"budget_items"},()=>supabase.from("budget_items").select().then(r=>r.data&&setBudgetItems(r.data))).subscribe(),
+      supabase.channel("wsh").on("postgres_changes",{event:"*",schema:"public",table:"wishlist"},()=>supabase.from("wishlist").select().then(r=>r.data?.[0]&&setWishlist(r.data[0]))).subscribe(),
+      supabase.channel("bch").on("postgres_changes",{event:"*",schema:"public",table:"bachelorette"},()=>supabase.from("bachelorette").select().then(r=>r.data?.[0]&&setBach(r.data[0]))).subscribe(),
     ];
-    return () => unsubs.forEach(fn => fn());
+    return () => channels.forEach(c => supabase.removeChannel(c));
   }, []);
 
-  const save = async (table, data) => {
+  const save = useCallback(async (table, data) => {
     setSyncing(true);
     await supabase.from(table).upsert(data);
     setTimeout(() => setSyncing(false), 600);
-  };
+  }, []);
 
-  // ── SETUP ──
   const handleSetup = async ({ bride, partner, date, budget }) => {
     const cfg = { id:"main", bride_name:bride, partner_name:partner, wedding_date:date, budget };
     setConfig(cfg);
@@ -871,7 +827,6 @@ function App() {
     await save("budget_items", budgetSeed);
   };
 
-  // ── TASK ACTIONS ──
   const toggleTask = async (id, done) => {
     setTasks(p => p.map(t => t.id===id ? {...t,done} : t));
     await save("tasks", {id, done});
@@ -896,7 +851,6 @@ function App() {
     }
   };
 
-  // ── CONFIG UPDATE ──
   const handleEditSave = async (updates) => {
     const newCfg = {...config, ...updates};
     setConfig(newCfg);
@@ -909,25 +863,21 @@ function App() {
     setEditOpen(false);
   };
 
-  // ── WISHLIST ──
   const updateWishlist = async (updated) => {
     setWishlist(updated);
     await save("wishlist", {...updated, id:"main"});
   };
 
-  // ── BACHELORETTE ──
   const updateBach = async (updated) => {
     setBach(updated);
     await save("bachelorette", {...updated, id:"main"});
   };
 
-  // ── BUDGET ──
   const updateActual = async (id, actual) => {
     setBudgetItems(p => p.map(i => i.id===id ? {...i,actual} : i));
     await save("budget_items", {id, actual});
   };
 
-  // ── DERIVED METRICS ──
   const t0 = today();
   const overdue = tasks.filter(t=>{ const d=t.due_date||t.dueDate; return d&&new Date(d).setHours(0,0,0,0)<t0.getTime()&&!t.done; });
   const dueSoon = tasks.filter(t=>{ const d=t.due_date||t.dueDate; if(!d||t.done)return false; const diff=Math.round((new Date(d).setHours(0,0,0,0)-t0.getTime())/86400000); return diff>=0&&diff<=60; });
@@ -935,7 +885,6 @@ function App() {
   const pct = tasks.length ? Math.round(done/tasks.length*100) : 0;
   const actual = budgetItems.reduce((s,i)=>s+(i.actual||0),0);
   const remaining = (config?.budget||25000) - actual;
-
   const TABS = ["Timeline","Calendar","Budget","Vendors","Vision","Bachelorette","Quick Grounding"];
 
   if (loading) return <><style>{GLOBAL_STYLE}</style><Spinner/></>;
@@ -946,8 +895,6 @@ function App() {
   return (
     <div style={{minHeight:"100vh",background:C.bg}}>
       <style>{GLOBAL_STYLE}</style>
-
-      {/* HEADER */}
       <div style={{background:C.pinkPale,borderBottom:`1px solid ${C.pinkLight}`,position:"relative",overflow:"hidden"}}>
         <PalmBg/>
         <div style={{position:"relative",zIndex:1,padding:"24px 24px 0"}}>
@@ -997,8 +944,6 @@ function App() {
           </div>
         </div>
       </div>
-
-      {/* CONTENT */}
       <div style={{maxWidth:960,margin:"0 auto",padding:"24px 16px"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:20}}>
           <MetricCard label="Progress" value={`${pct}%`} sub={`${done} of ${tasks.length} tasks`} accent={C.pink}/>
@@ -1021,12 +966,10 @@ function App() {
         {tab==="Bachelorette"&&<TabBachelorette bach={bach} onUpdate={updateBach}/>}
         {tab==="Quick Grounding"&&<TabWhoopee/>}
       </div>
-
       {modalTask&&<DetailModal task={modalTask} onSave={(details)=>saveDetails(modalTask.id,details)} onClose={()=>setModalTask(null)}/>}
       {editOpen&&<EditModal config={config} onSave={handleEditSave} onClose={()=>setEditOpen(false)}/>}
     </div>
   );
 }
 
-import ReactDOM from 'react-dom/client'
-ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
