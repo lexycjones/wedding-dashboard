@@ -6,6 +6,17 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
+js
+
+window.onerror = (msg, src, line, col, err) => {
+  document.body.innerHTML = `<div style="font-family:sans-serif;padding:40px;color:#c00">
+    <h2>App Error</h2>
+    <p><b>${msg}</b></p>
+    <p>Line ${line}: ${src}</p>
+    <pre>${err?.stack}</pre>
+  </div>`;
+};
+
 // ── COLORS ──
 const C = {
   bg:"#FFF8F5",bgAlt:"#FFF2EC",white:"#FFFFFF",
